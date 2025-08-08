@@ -111,13 +111,7 @@ class CSV_Import_Pro_Admin {
 		// Filter für Anpassungen durch andere Plugins/Themes
 		$this->menu_config = apply_filters( 'csv_import_menu_config', $this->menu_config );
 	}
-add_management_page(  // Statt add_menu_page
-    'CSV Import Pro',
-    'CSV Import', 
-    'edit_pages',     // Niedrigere Berechtigung
-    'csv-import',
-    [$this, 'display_main_page']
-);
+
 	/**
 	 * Initialisiert WordPress-Hooks
 	 */
