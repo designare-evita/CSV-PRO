@@ -73,9 +73,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 								<td>
 									<select id="frequency" name="frequency" required>
 										<option value="">-- Frequenz wählen --</option>
-										<option value="csv_import_hourly">Stündlich</option>
-										<option value="csv_import_twice_daily">Zweimal täglich</option>
-										<option value="daily">Täglich</option>
+										<option value="hourly">Stündlich</option>
+                                        <option value="twicedaily">Zweimal täglich</option>
+                                        <option value="daily">Täglich</option>
 									</select>
 									<p class="description">Wie oft soll der Import automatisch ausgeführt werden?</p>
 								</td>
