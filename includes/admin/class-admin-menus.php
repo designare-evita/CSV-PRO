@@ -50,7 +50,7 @@ class CSV_Import_Pro_Admin {
 			'main' => [
 				'page_title' => __( 'CSV Import Pro', 'csv-import' ),
 				'menu_title' => __( 'CSV Import', 'csv-import' ),
-				'capability' => 'manage_options',
+				'capability' => 'edit_pages',
 				'menu_slug'  => $this->menu_slug,
 				'callback'   => [ $this, 'display_main_page' ],
 				'icon_url'   => 'dashicons-database-import',
