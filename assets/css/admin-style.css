@@ -83,3 +83,22 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* Memory-Status-Widget */
+#csv-memory-status-live {
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.csv-memory-status-widget {
+    font-size: 14px;
+}
+
+.csv-memory-status-widget .status-bar {
+    height: 20px;
+    background: #e9ecef;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 10px 0;
+}
