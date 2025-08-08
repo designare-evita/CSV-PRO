@@ -1,7 +1,7 @@
 <?php
 /**
  * Verarbeitet alle AJAX-Anfragen aus dem Admin-Bereich des CSV Import Pro Plugins.
- * Version 6.0 - Finaler Stabilitäts-Fix
+ * Version 6.1 - Finaler Stabilitäts- und Funktions-Fix
  */
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
@@ -22,7 +22,8 @@ function csv_import_register_ajax_hooks() {
         add_action('wp_ajax_' . $action, $action . '_handler');
     }
 }
-add_action( 'plugins_loaded', 'csv_import_register_ajax_hooks' );
+// Haken wird direkt ausgeführt, da diese Datei bei Bedarf geladen wird.
+csv_import_register_ajax_hooks();
 
 /**
  * Handler für die Validierung von Konfiguration und CSV-Dateien.
@@ -38,6 +39,11 @@ function csv_import_validate_handler() {
     $response_data = [ 'valid' => false, 'message' => 'Unbekannter Test-Typ.' ];
 
     try {
+        // Sicherstellen, dass die Funktionen verfügbar sind
+        if (!function_exists('csv_import_get_config')) {
+             throw new Exception('Kernfunktionen des Plugins sind nicht geladen.');
+        }
+
         $config = csv_import_get_config();
         
         if ( $type === 'config' ) {
