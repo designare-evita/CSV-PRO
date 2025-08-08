@@ -46,6 +46,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 	<?php endif; ?>
 
 	<div class="csv-import-dashboard">
+        <div class="card" style="margin-bottom: 20px;">
+            <h2>💾 Memory-Status</h2>
+            <div id="csv-memory-status-live">
+                <?php 
+                if (function_exists('csv_import_get_memory_status')) {
+                    $memory = csv_import_get_memory_status();
+                    echo '<p>Speicher: ' . $memory['current_formatted'] . ' / ' . $memory['limit_formatted'];
+                    echo ' (' . $memory['usage_percent'] . '%)</p>';
+                }
+                ?>
+            </div>
+        </div>
+
 		<div class="csv-import-main-grid">
 			<div class="card">
 				<h2>🔗 Dropbox Import</h2>
