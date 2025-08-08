@@ -3,7 +3,7 @@
  * Core-Funktionen für das CSV Import Pro Plugin
  * * Diese Datei enthält alle grundlegenden Funktionen, die von anderen Plugin-Teilen
  * benötigt werden. Sie muss als erstes geladen werden.
- * * Version: 5.2-refactored
+ * * Version: 5.2-refactored (mit Memory-Optimierungs-Wrapper)
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -764,12 +764,9 @@ function csv_import_detect_csv_delimiter( string $csv_content ): string {
 // ===================================================================
 
 /**
- * Startet den CSV-Import mit erweiterten Sicherheitschecks (Hauptfunktion)
- * * @param string $source 'dropbox' oder 'local'
- * @param array $config Import-Konfiguration
- * @return array Import-Ergebnis
+ * Neue Funktion mit der eigentlichen Import-Logik.
  */
-function csv_import_start_import( string $source, array $config = null ): array {
+function csv_import_start_import_with_memory_optimization(string $source, array $config = null): array {
     try {
         // Sicherheitscheck: Import bereits laufend?
         if ( csv_import_is_import_running() ) {
@@ -857,6 +854,14 @@ function csv_import_start_import( string $source, array $config = null ): array 
         ];
     }
 }
+
+/**
+ * Startet den CSV-Import (Hauptfunktion) - // ALTE Funktion komplett ersetzen durch:
+ */
+function csv_import_start_import(string $source, array $config = null): array {
+    return csv_import_start_import_with_memory_optimization($source, $config);
+}
+
 
 /**
  * Verarbeitet die CSV-Daten und erstellt Posts
