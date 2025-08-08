@@ -1,7 +1,7 @@
 <?php
 /**
  * Verarbeitet alle AJAX-Anfragen aus dem Admin-Bereich des CSV Import Pro Plugins.
- * Version 5.5 - Robuste Nonce-Validierung
+ * Version 6.0 - Finaler Stabilitäts-Fix
  */
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
@@ -15,10 +15,7 @@ function csv_import_register_ajax_hooks() {
         'csv_import_validate',
         'csv_import_start',
         'csv_import_get_progress',
-        'csv_import_cancel',
-        'csv_import_get_profile_details',
-        'csv_import_system_check',
-        'csv_debug_info'
+        'csv_import_cancel'
     ];
 
     foreach($ajax_actions as $action) {
@@ -28,22 +25,14 @@ function csv_import_register_ajax_hooks() {
 add_action( 'plugins_loaded', 'csv_import_register_ajax_hooks' );
 
 /**
- * Eine zentrale Funktion für Sicherheitsprüfungen bei allen AJAX-Anfragen.
- */
-function csv_import_ajax_security_check() {
-    if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( $_POST['nonce'], 'csv_import_ajax' ) ) {
-        wp_send_json_error( ['message' => 'Sicherheits-Token (Nonce) ist ungültig oder abgelaufen. Bitte laden Sie die Seite neu und versuchen Sie es erneut.'] );
-    }
-    if ( ! current_user_can( 'manage_options' ) ) {
-        wp_send_json_error( ['message' => 'Keine Berechtigung.'] );
-    }
-}
-
-/**
  * Handler für die Validierung von Konfiguration und CSV-Dateien.
  */
 function csv_import_validate_handler() {
-    csv_import_ajax_security_check();
+    // Sicherheitsprüfung
+    check_ajax_referer( 'csv_import_ajax', 'nonce' );
+    if ( ! current_user_can( 'edit_pages' ) ) {
+        wp_send_json_error( ['message' => 'Keine Berechtigung.'] );
+    }
 
     $type = isset( $_POST['type'] ) ? sanitize_key( $_POST['type'] ) : '';
     $response_data = [ 'valid' => false, 'message' => 'Unbekannter Test-Typ.' ];
@@ -57,7 +46,7 @@ function csv_import_validate_handler() {
             if (!$validation['valid']) {
                 $response_data['message'] = 'Konfigurationsfehler: <ul><li>' . implode('</li><li>', $validation['errors']) . '</li></ul>';
             } else {
-                 $response_data['message'] = '✅ Konfiguration ist gültig.';
+                 $response_data['message'] = '✅ Konfiguration ist gültig und alle Systemanforderungen sind erfüllt.';
             }
 
         } elseif ( in_array( $type, [ 'dropbox', 'local' ] ) ) {
@@ -69,7 +58,7 @@ function csv_import_validate_handler() {
         $response_data['message'] = 'Validierungsfehler: ' . $e->getMessage();
     }
 
-    if ( $response_data['valid'] ) {
+    if ( !empty($response_data['valid']) && $response_data['valid'] ) {
         wp_send_json_success( $response_data );
     } else {
         wp_send_json_error( $response_data );
@@ -80,26 +69,29 @@ function csv_import_validate_handler() {
  * Handler zum Starten des Imports.
  */
 function csv_import_start_handler() {
-    csv_import_ajax_security_check();
+    check_ajax_referer( 'csv_import_ajax', 'nonce' );
+    if ( ! current_user_can( 'edit_pages' ) ) {
+        wp_send_json_error( ['message' => 'Keine Berechtigung.'] );
+    }
 
     $source = isset( $_POST['source'] ) ? sanitize_key( $_POST['source'] ) : '';
     if ( ! in_array( $source, ['dropbox', 'local'] ) ) {
         wp_send_json_error( [ 'message' => 'Ungültige Import-Quelle.' ] );
     }
 
-    if ( csv_import_is_import_running() ) {
+    if ( function_exists('csv_import_is_import_running') && csv_import_is_import_running() ) {
         wp_send_json_error( [ 'message' => 'Ein Import läuft bereits.' ] );
     }
     
     if ( class_exists( 'CSV_Import_Pro_Run' ) ) {
         $result = CSV_Import_Pro_Run::run( $source );
-        if ( $result['success'] ) {
+        if ( !empty($result['success']) ) {
             wp_send_json_success($result);
         } else {
             wp_send_json_error($result);
         }
     } else {
-        wp_send_json_error(['message' => 'Kritischer Fehler: Import-Klasse nicht gefunden.']);
+        wp_send_json_error(['message' => 'Kritischer Fehler: Import-Klasse (CSV_Import_Pro_Run) nicht gefunden.']);
     }
 }
 
@@ -107,16 +99,31 @@ function csv_import_start_handler() {
  * Handler zum Abrufen des Import-Fortschritts.
  */
 function csv_import_get_progress_handler() {
-    csv_import_ajax_security_check();
-    $progress = csv_import_get_progress();
-    wp_send_json_success( $progress );
+    check_ajax_referer( 'csv_import_ajax', 'nonce' );
+    if ( ! current_user_can( 'edit_pages' ) ) {
+        wp_send_json_error( ['message' => 'Keine Berechtigung.'] );
+    }
+
+    if(function_exists('csv_import_get_progress')){
+        $progress = csv_import_get_progress();
+        wp_send_json_success( $progress );
+    } else {
+        wp_send_json_error(['message' => 'Fortschritts-Funktion nicht verfügbar.']);
+    }
 }
 
 /**
  * Handler zum Abbrechen eines laufenden Imports.
  */
 function csv_import_cancel_handler() {
-    csv_import_ajax_security_check();
-    csv_import_force_reset_import_status();
-    wp_send_json_success( ['message' => 'Import abgebrochen und zurückgesetzt.'] );
+    check_ajax_referer( 'csv_import_ajax', 'nonce' );
+    if ( ! current_user_can( 'edit_pages' ) ) {
+        wp_send_json_error( ['message' => 'Keine Berechtigung.'] );
+    }
+    if(function_exists('csv_import_force_reset_import_status')){
+        csv_import_force_reset_import_status();
+        wp_send_json_success( ['message' => 'Import abgebrochen und zurückgesetzt.'] );
+    } else {
+         wp_send_json_error( ['message' => 'Reset-Funktion nicht verfügbar.'] );
+    }
 }
