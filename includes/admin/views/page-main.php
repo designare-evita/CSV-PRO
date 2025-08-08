@@ -45,27 +45,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 	<?php endif; ?>
 
 	<div class="csv-import-dashboard">
-        <div class="card" style="margin-bottom: 20px;">
-            <h2>💾 Memory-Status</h2>
-            <div id="csv-memory-status-live">
-                <?php 
-                if (function_exists('csv_import_get_memory_status')) {
-                    $memory = csv_import_get_memory_status();
-                    echo '<p>Speicher: ' . esc_html($memory['current_formatted']) . ' / ' . esc_html($memory['limit_formatted']);
-                    echo ' (' . esc_html($memory['usage_percent']) . '%)</p>';
-                }
-                ?>
-            </div>
-        </div>
-
 		<div class="csv-import-main-grid">
 			<div class="card">
 				<h2>🔗 Dropbox Import</h2>
 				<p>Importiert die CSV-Datei von der in den Einstellungen hinterlegten Dropbox-URL.</p>
 				<?php if ( $config_valid['dropbox_ready'] && empty($progress['running']) ) : ?>
 					<p>
-						<button data-source="dropbox" class="button button-primary button-large csv-import-btn"
-						   onclick="return confirm('Dropbox Import wirklich starten?');">
+						<button data-source="dropbox" class="button button-primary button-large csv-import-btn">
 							🚀 Dropbox Import starten
 						</button>
 					</p>
@@ -90,8 +76,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 				<p>Importiert die CSV-Datei vom in den Einstellungen hinterlegten lokalen Serverpfad.</p>
 				<?php if ( $config_valid['local_ready'] && empty($progress['running']) ) : ?>
 					<p>
-						<button data-source="local" class="button button-primary button-large csv-import-btn"
-						   onclick="return confirm('Lokalen Import wirklich starten?');">
+						<button data-source="local" class="button button-primary button-large csv-import-btn">
 							🚀 Lokalen Import starten
 						</button>
 					</p>
@@ -145,16 +130,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 						echo esc_html( $last_run ? mysql2date( 'd.m.Y H:i', $last_run ) : 'Nie' );
 						?>
 					</li>
-					<li><strong>Letzte Anzahl:</strong> <?php echo esc_html( get_option( 'csv_import_last_count', 0 ) ); ?></li>
-					<li><strong>Letzte Quelle:</strong> <?php echo esc_html( get_option( 'csv_import_last_source', '-' ) ); ?></li>
 				</ul>
 			</div>
-		</div>
-
-		<div class="bottom-actions">
-			<a href="<?php echo esc_url( admin_url( 'tools.php?page=csv-import-settings' ) ); ?>"
-			   class="button button-secondary">⚙️ Alle Einstellungen</a>
-			<button type="button" class="button button-secondary" onclick="location.reload();">🔄 Seite aktualisieren</button>
 		</div>
 	</div>
 </div>
