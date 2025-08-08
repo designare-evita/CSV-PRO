@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 	<?php 
     $progress = csv_import_get_progress();
-    if ( $progress['running'] ) : 
+    if ( !empty($progress['running']) ) : 
     ?>
 		<div class="notice notice-info">
 			<p><strong>Import läuft:</strong> <?php echo esc_html( $progress['processed'] ); ?> von <?php echo esc_html( $progress['total'] ); ?> Zeilen verarbeitet (<?php echo esc_html( $progress['percent'] ); ?>%)</p>
@@ -62,7 +62,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<div class="card">
 				<h2>🔗 Dropbox Import</h2>
 				<p>Importiert die CSV-Datei von der in den Einstellungen hinterlegten Dropbox-URL.</p>
-				<?php if ( $config_valid['dropbox_ready'] && !$progress['running'] ) : ?>
+				<?php if ( $config_valid['dropbox_ready'] && empty($progress['running']) ) : ?>
 					<p>
 						<button data-source="dropbox" class="button button-primary button-large csv-import-btn"
 						   onclick="return confirm('Dropbox Import wirklich starten?');">
@@ -75,7 +75,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 							🚀 Dropbox Import starten
 						</button><br>
 						<small class="error-text">
-							<?php if ( $progress['running'] ) : ?>
+							<?php if ( !empty($progress['running']) ) : ?>
 								⏳ Import läuft bereits
 							<?php else : ?>
 								⚠️ Konfiguration unvollständig oder Dropbox-URL fehlt/ist ungültig.
@@ -88,7 +88,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<div class="card">
 				<h2>📁 Lokaler Import</h2>
 				<p>Importiert die CSV-Datei vom in den Einstellungen hinterlegten lokalen Serverpfad.</p>
-				<?php if ( $config_valid['local_ready'] && !$progress['running'] ) : ?>
+				<?php if ( $config_valid['local_ready'] && empty($progress['running']) ) : ?>
 					<p>
 						<button data-source="local" class="button button-primary button-large csv-import-btn"
 						   onclick="return confirm('Lokalen Import wirklich starten?');">
@@ -101,7 +101,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 							🚀 Lokalen Import starten
 						</button><br>
 						<small class="error-text">
-							<?php if ( $progress['running'] ) : ?>
+							<?php if ( !empty($progress['running']) ) : ?>
 								⏳ Import läuft bereits
 							<?php else : ?>
 								⚠️ Konfiguration unvollständig oder lokale CSV-Datei nicht gefunden/lesbar.
