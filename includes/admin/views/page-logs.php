@@ -5,8 +5,7 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
-?>
-<div class="wrap">
+?><div class="wrap">
 	<h1>CSV Import Logs &amp; Monitoring</h1>
 
 	<?php
@@ -46,7 +45,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<div class="status-card">
 				<h3>Import-Fortschritt</h3>
 				<?php $progress = csv_import_get_progress(); ?>
-				<?php if ( $progress['running'] ) : ?>
+				<?php if ( !empty($progress['running']) ) : ?>
 					<div class="progress-active">
 						<div class="progress-bar">
 							<div class="progress-fill" style="width: <?php echo esc_attr( $progress['percent'] ); ?>%"></div>
@@ -99,7 +98,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 								<tr class="log-row log-level-<?php echo esc_attr( $log_entry['level'] ?? 'debug' ); ?>">
 									<td>
                                         <?php 
-                                        // **KORREKTUR HIER**
                                         if ( ! empty( $log_entry['timestamp'] ) ) {
                                             echo esc_html( mysql2date('d.m.Y H:i:s', $log_entry['timestamp']) ); 
                                         } 
@@ -126,18 +124,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 						<div class="tablenav-pages">
 							<span class="displaying-num"><?php echo esc_html( $total_logs ); ?> Einträge</span>
 							<?php
-							$base_url = admin_url('tools.php?page=csv-import-logs');
-							if ( $filter_level !== 'all' ) {
-								$base_url = add_query_arg( 'level', $filter_level, $base_url );
-							}
-
 							echo paginate_links( [
-								'base'    => $base_url . '%_%',
-								'format'  => '&paged=%#%',
+								'base'    => add_query_arg('paged', '%#%', admin_url('tools.php?page=csv-import-logs')),
+								'format'  => '',
 								'current' => $page,
 								'total'   => $total_pages,
-								'prev_text' => '«',
-								'next_text' => '»',
 							] );
 							?>
 						</div>
@@ -152,17 +143,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 					<input type="hidden" name="action" value="clear_logs">
 					<button type="submit" class="button">🗑️ Alle Logs löschen</button>
 				</form>
-			</div>
-		</div>
-		
-		<div class="card">
-			<h2>📈 Performance Trends (Fehler pro Tag)</h2>
-			<div class="performance-chart">
-				<?php if ( ! empty( $error_stats['error_trends'] ) ) : ?>
-					<canvas id="errorTrendChart" width="400" height="200"></canvas>
-				<?php else : ?>
-					<p><em>Noch keine Trend-Daten verfügbar.</em></p>
-				<?php endif; ?>
 			</div>
 		</div>
 	</div>
