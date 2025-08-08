@@ -27,10 +27,6 @@ class CSV_Import_Pro_Run {
 	}
 
 	private function execute_import(): array {
-		if ( class_exists( 'CSV_Import_Error_Handler' ) && method_exists( 'CSV_Import_Error_Handler', 'clear_error_log' ) ) {
-			// Optional: Alte Logs vor einem neuen Lauf löschen
-		}
-		
 		do_action( 'csv_import_start' );
 		update_option( 'csv_import_session_id', $this->session_id );
 		
@@ -38,7 +34,6 @@ class CSV_Import_Pro_Run {
 			$this->load_and_validate_config();
 			$this->set_system_limits();
 
-			// CSV-Daten über core-functions laden
 			$this->csv_data = csv_import_load_csv_data( $this->source, $this->config );
 			
 			if ( empty( $this->csv_data['data'] ) ) {
