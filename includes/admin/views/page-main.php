@@ -5,8 +5,7 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
-?>
-<div class="wrap">
+?><div class="wrap">
 	<h1>CSV Import für Landingpages</h1>
 
 	<?php if ( isset( $_GET['result'] ) && isset( $_GET['message'] ) ) : ?>
@@ -17,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 	<?php 
     $progress = csv_import_get_progress();
-    if ( $progress['status'] === 'processing' ) : 
+    if ( $progress['running'] ) : 
     ?>
 		<div class="notice notice-info">
 			<p><strong>Import läuft:</strong> <?php echo esc_html( $progress['processed'] ); ?> von <?php echo esc_html( $progress['total'] ); ?> Zeilen verarbeitet (<?php echo esc_html( $progress['percent'] ); ?>%)</p>
@@ -52,8 +51,8 @@ if ( ! defined( 'ABSPATH' ) ) {
                 <?php 
                 if (function_exists('csv_import_get_memory_status')) {
                     $memory = csv_import_get_memory_status();
-                    echo '<p>Speicher: ' . $memory['current_formatted'] . ' / ' . $memory['limit_formatted'];
-                    echo ' (' . $memory['usage_percent'] . '%)</p>';
+                    echo '<p>Speicher: ' . esc_html($memory['current_formatted']) . ' / ' . esc_html($memory['limit_formatted']);
+                    echo ' (' . esc_html($memory['usage_percent']) . '%)</p>';
                 }
                 ?>
             </div>
@@ -63,7 +62,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<div class="card">
 				<h2>🔗 Dropbox Import</h2>
 				<p>Importiert die CSV-Datei von der in den Einstellungen hinterlegten Dropbox-URL.</p>
-				<?php if ( $config_valid['dropbox_ready'] && $progress['status'] !== 'processing' ) : ?>
+				<?php if ( $config_valid['dropbox_ready'] && !$progress['running'] ) : ?>
 					<p>
 						<button data-source="dropbox" class="button button-primary button-large csv-import-btn"
 						   onclick="return confirm('Dropbox Import wirklich starten?');">
@@ -76,7 +75,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 							🚀 Dropbox Import starten
 						</button><br>
 						<small class="error-text">
-							<?php if ( $progress['status'] === 'processing' ) : ?>
+							<?php if ( $progress['running'] ) : ?>
 								⏳ Import läuft bereits
 							<?php else : ?>
 								⚠️ Konfiguration unvollständig oder Dropbox-URL fehlt/ist ungültig.
@@ -89,7 +88,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<div class="card">
 				<h2>📁 Lokaler Import</h2>
 				<p>Importiert die CSV-Datei vom in den Einstellungen hinterlegten lokalen Serverpfad.</p>
-				<?php if ( $config_valid['local_ready'] && $progress['status'] !== 'processing' ) : ?>
+				<?php if ( $config_valid['local_ready'] && !$progress['running'] ) : ?>
 					<p>
 						<button data-source="local" class="button button-primary button-large csv-import-btn"
 						   onclick="return confirm('Lokalen Import wirklich starten?');">
@@ -102,7 +101,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 							🚀 Lokalen Import starten
 						</button><br>
 						<small class="error-text">
-							<?php if ( $progress['status'] === 'processing' ) : ?>
+							<?php if ( $progress['running'] ) : ?>
 								⏳ Import läuft bereits
 							<?php else : ?>
 								⚠️ Konfiguration unvollständig oder lokale CSV-Datei nicht gefunden/lesbar.
@@ -138,7 +137,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 			<div class="card">
 				<h2>📈 Statistiken</h2>
-				<?php $stats = csv_import_get_stats(); ?>
 				<ul class="status-list">
 					<li><strong>Gesamt importiert:</strong> <?php echo esc_html( get_option( 'csv_import_total_imported', 0 ) ); ?></li>
 					<li><strong>Letzter Import:</strong>
