@@ -7,7 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Erstellt die Admin-Menüs und steuert die Anzeige der Plugin-Seiten.
  * 
- * Version 7.0 - Komplette Überarbeitung mit regulärem Admin-Menü
+ * Version 8.0 - Tools-Menü Integration mit korrigierten Berechtigungen
  * 
  * @since 6.0
  */
@@ -43,67 +43,60 @@ class CSV_Import_Pro_Admin {
 	}
 
 	/**
-	 * Konfiguriert Menü-Struktur
+	 * Konfiguriert Menü-Struktur - KORRIGIERT für Tools-Menü
 	 */
 	private function setup_menu_config() {
 		$this->menu_config = [
 			'main' => [
 				'page_title' => __( 'CSV Import Pro', 'csv-import' ),
 				'menu_title' => __( 'CSV Import', 'csv-import' ),
-				'capability' => 'manage_options',
+				'capability' => 'edit_pages', // KORRIGIERT: Weniger restriktiv
 				'menu_slug'  => $this->menu_slug,
 				'callback'   => [ $this, 'display_main_page' ],
-				'icon_url'   => 'dashicons-database-import',
-				'position'   => 30
+				'parent'     => 'tools.php' // NEU: Unter Tools-Menü
 			],
 			'submenus' => [
 				'import' => [
 					'page_title' => __( 'CSV Import Dashboard', 'csv-import' ),
 					'menu_title' => __( 'Import Dashboard', 'csv-import' ),
 					'menu_slug'  => $this->menu_slug,
+					'capability' => 'edit_pages', // KORRIGIERT
 					'callback'   => [ $this, 'display_main_page' ]
 				],
 				'settings' => [
 					'page_title' => __( 'CSV Import Einstellungen', 'csv-import' ),
 					'menu_title' => __( 'Einstellungen', 'csv-import' ),
 					'menu_slug'  => 'csv-import-settings',
+					'capability' => 'edit_pages', // KORRIGIERT: Auch für Einstellungen
 					'callback'   => [ $this, 'display_settings_page' ]
 				],
 				'backups' => [
 					'page_title' => __( 'CSV Import Backups', 'csv-import' ),
 					'menu_title' => __( 'Backups & Rollback', 'csv-import' ),
 					'menu_slug'  => 'csv-import-backups', 
+					'capability' => 'edit_pages', // KORRIGIERT
 					'callback'   => [ $this, 'display_backup_page' ]
 				],
 				'profiles' => [
 					'page_title' => __( 'CSV Import Profile', 'csv-import' ),
 					'menu_title' => __( 'Import-Profile', 'csv-import' ),
 					'menu_slug'  => 'csv-import-profiles',
+					'capability' => 'edit_pages', // KORRIGIERT
 					'callback'   => [ $this, 'display_profiles_page' ]
 				],
 				'scheduling' => [
 					'page_title' => __( 'CSV Import Scheduling', 'csv-import' ),
 					'menu_title' => __( 'Automatisierung', 'csv-import' ),
 					'menu_slug'  => 'csv-import-scheduling',
+					'capability' => 'manage_options', // Bleibt restriktiv für Cron-Jobs
 					'callback'   => [ $this, 'display_scheduling_page' ]
 				],
 				'logs' => [
 					'page_title' => __( 'CSV Import Logs', 'csv-import' ),
 					'menu_title' => __( 'Logs & Monitoring', 'csv-import' ),
 					'menu_slug'  => 'csv-import-logs',
+					'capability' => 'edit_pages', // KORRIGIERT
 					'callback'   => [ $this, 'display_logs_page' ]
-				],
-				'advanced' => [
-					'page_title' => __( 'CSV Import Erweiterte Einstellungen', 'csv-import' ),
-					'menu_title' => __( 'Erweitert', 'csv-import' ),
-					'menu_slug'  => 'csv-import-advanced',
-					'callback'   => [ $this, 'display_advanced_settings_page' ]
-				],
-				'tools' => [
-					'page_title' => __( 'CSV Import Werkzeuge', 'csv-import' ),
-					'menu_title' => __( 'Werkzeuge', 'csv-import' ),
-					'menu_slug'  => 'csv-import-tools',
-					'callback'   => [ $this, 'display_tools_page' ]
 				]
 			]
 		];
@@ -139,69 +132,122 @@ class CSV_Import_Pro_Admin {
 
 		// Admin-Footer-Text anpassen auf Plugin-Seiten
 		add_filter( 'admin_footer_text', [ $this, 'admin_footer_text' ] );
+
+		// KORRIGIERT: Permission-Check-Hook hinzufügen
+		add_action( 'current_screen', [ $this, 'check_page_permissions' ] );
 	}
 
 	/**
-	 * Registriert das Admin-Menü und Untermenüs
+	 * Registriert das Admin-Menü unter Tools - VOLLSTÄNDIG NEU
 	 */
 	public function register_admin_menu() {
 		$main_config = $this->menu_config['main'];
 		
-		// Hauptmenüpunkt hinzufügen
-		$main_page = add_menu_page(
-			$main_config['page_title'],
-			$main_config['menu_title'],
-			$main_config['capability'],
-			$main_config['menu_slug'],
-			$main_config['callback'],
-			$main_config['icon_url'],
-			$main_config['position']
+		// KORRIGIERT: Hauptseite unter Tools-Menü hinzufügen
+		$main_page = add_management_page(
+			$main_config['page_title'],  // Page title
+			$main_config['menu_title'],  // Menu title  
+			$main_config['capability'],  // Capability
+			$main_config['menu_slug'],   // Menu slug
+			$main_config['callback']     // Callback function
 		);
 
 		// Hook für Hauptseite
 		add_action( "load-{$main_page}", [ $this, 'load_main_page' ] );
 		$this->admin_pages['main'] = $main_page;
 
-		// Untermenüs hinzufügen
+		// KORRIGIERT: Untermenüs als separate Tools-Seiten hinzufügen
 		foreach ( $this->menu_config['submenus'] as $submenu_key => $submenu_config ) {
-			$submenu_page = add_submenu_page(
-				$this->menu_slug,
-				$submenu_config['page_title'],
-				$submenu_config['menu_title'],
-				$main_config['capability'], // Gleiche Berechtigung wie Hauptmenü
-				$submenu_config['menu_slug'],
-				$submenu_config['callback']
+			// Skip das Import-Dashboard (ist die Hauptseite)
+			if ( $submenu_key === 'import' ) {
+				continue;
+			}
+
+			$submenu_page = add_management_page(
+				$submenu_config['page_title'], // Page title
+				'CSV ' . $submenu_config['menu_title'], // Menu title mit Prefix
+				$submenu_config['capability'], // Capability
+				$submenu_config['menu_slug'],  // Menu slug
+				$submenu_config['callback']    // Callback
 			);
 
 			// Hook für Unterseite
-			add_action( "load-{$submenu_page}", [ $this, 'load_submenu_page' ] );
-			$this->admin_pages[$submenu_key] = $submenu_page;
+			if ( $submenu_page ) {
+				add_action( "load-{$submenu_page}", [ $this, 'load_submenu_page' ] );
+				$this->admin_pages[$submenu_key] = $submenu_page;
+			}
 		}
 
-		// Entwickler-Tools (nur bei aktiviertem Debug)
-		if ( defined( 'CSV_IMPORT_DEBUG' ) && CSV_IMPORT_DEBUG ) {
-			$debug_page = add_submenu_page(
-				$this->menu_slug,
+		// KORRIGIERT: Entwickler-Tools nur bei aktiviertem Debug und Admin-Berechtigung
+		if ( defined( 'CSV_IMPORT_DEBUG' ) && CSV_IMPORT_DEBUG && current_user_can( 'manage_options' ) ) {
+			$debug_page = add_management_page(
 				__( 'CSV Import Debug', 'csv-import' ),
-				__( '🔧 Debug', 'csv-import' ),
-				'manage_options',
+				__( 'CSV Debug', 'csv-import' ),
+				'manage_options', // Debug bleibt restriktiv
 				'csv-import-debug',
 				[ $this, 'display_debug_page' ]
 			);
-			$this->admin_pages['debug'] = $debug_page;
+			
+			if ( $debug_page ) {
+				$this->admin_pages['debug'] = $debug_page;
+			}
 		}
 
-		// Plugin-Info zur WordPress-Übersicht hinzufügen
-		$this->maybe_add_dashboard_widget();
+		// KORRIGIERT: Dashboard-Widget nur für berechtigt Benutzer
+		if ( current_user_can( 'edit_pages' ) ) {
+			$this->maybe_add_dashboard_widget();
+		}
 	}
 
 	/**
-	 * Lädt Assets nur auf Plugin-Seiten
+	 * NEU: Permission-Check für Plugin-Seiten
+	 */
+	public function check_page_permissions() {
+		$screen = get_current_screen();
+		
+		if ( ! $screen ) {
+			return;
+		}
+
+		// Prüfen ob es eine unserer Plugin-Seiten ist
+		$csv_import_pages = [
+			'tools_page_csv-import',
+			'tools_page_csv-import-settings',
+			'tools_page_csv-import-backups',
+			'tools_page_csv-import-profiles',
+			'tools_page_csv-import-scheduling',
+			'tools_page_csv-import-logs',
+			'tools_page_csv-import-debug'
+		];
+
+		if ( in_array( $screen->id, $csv_import_pages ) ) {
+			// Mindest-Berechtigung prüfen
+			if ( ! current_user_can( 'edit_pages' ) ) {
+				wp_die( 
+					__( 'Sie haben keine Berechtigung, auf diese Seite zuzugreifen.', 'csv-import' ),
+					__( 'Keine Berechtigung', 'csv-import' ),
+					[ 'response' => 403 ]
+				);
+			}
+
+			// Spezielle Berechtigung für kritische Seiten
+			if ( $screen->id === 'tools_page_csv-import-scheduling' && ! current_user_can( 'manage_options' ) ) {
+				wp_die( 
+					__( 'Für die Automatisierung sind Administrator-Rechte erforderlich.', 'csv-import' ),
+					__( 'Erweiterte Berechtigung erforderlich', 'csv-import' ),
+					[ 'response' => 403 ]
+				);
+			}
+		}
+	}
+
+	/**
+	 * Lädt Assets nur auf Plugin-Seiten - KORRIGIERT
 	 * 
 	 * @param string $hook_suffix
 	 */
 	public function enqueue_admin_assets( $hook_suffix ) {
-		// Prüfen ob wir auf einer Plugin-Seite sind
+		// KORRIGIERT: Tools-Seiten-Pattern prüfen
 		if ( ! $this->is_plugin_page( $hook_suffix ) ) {
 			return;
 		}
@@ -230,23 +276,25 @@ class CSV_Import_Pro_Admin {
 		// Spezielle Scripts für bestimmte Seiten
 		$this->enqueue_page_specific_assets( $hook_suffix );
 
-		// JavaScript-Variablen
+		// JavaScript-Variablen - KORRIGIERT
 		wp_localize_script( 'csv-import-pro-admin-script', 'csvImportAjax', [
 			'ajaxurl'            => admin_url( 'admin-ajax.php' ),
 			'nonce'              => wp_create_nonce( 'csv_import_ajax' ),
 			'admin_nonce'        => wp_create_nonce( 'csv_import_admin_action' ),
 			'strings'            => $this->get_js_strings(),
 			'config'             => $this->get_js_config(),
-			'debug'              => CSV_IMPORT_DEBUG,
+			'debug'              => defined( 'CSV_IMPORT_DEBUG' ) && CSV_IMPORT_DEBUG,
 			'current_page'       => $this->get_current_page_slug( $hook_suffix ),
-			'user_can_import'    => current_user_can( 'manage_options' ),
+			'user_can_import'    => current_user_can( 'edit_pages' ), // KORRIGIERT
+			'user_can_admin'     => current_user_can( 'manage_options' ),
 			'import_running'     => function_exists( 'csv_import_is_import_running' ) ? csv_import_is_import_running() : false,
-			'system_status'      => $this->get_system_status_for_js()
+			'system_status'      => $this->get_system_status_for_js(),
+			'menu_location'      => 'tools' // NEU: Für JavaScript-Navigation
 		] );
 	}
 
 	/**
-	 * Lädt seitenspezifische Assets
+	 * Lädt seitenspezifische Assets - KORRIGIERT
 	 * 
 	 * @param string $hook_suffix
 	 */
@@ -254,7 +302,7 @@ class CSV_Import_Pro_Admin {
 		$page_slug = $this->get_current_page_slug( $hook_suffix );
 
 		switch ( $page_slug ) {
-			case 'csv-import-logs':
+			case 'tools_page_csv-import-logs':
 				// Chart.js für Log-Visualisierung
 				wp_enqueue_script(
 					'chart-js',
@@ -265,7 +313,7 @@ class CSV_Import_Pro_Admin {
 				);
 				break;
 
-			case 'csv-import-scheduling':
+			case 'tools_page_csv-import-scheduling':
 				// Cron-Expression-Builder
 				wp_enqueue_script(
 					'cron-builder',
@@ -276,8 +324,7 @@ class CSV_Import_Pro_Admin {
 				);
 				break;
 
-			case 'csv-import-advanced':
-			case 'csv-import-debug':
+			case 'tools_page_csv-import-debug':
 				// CodeMirror für erweiterte Einstellungen
 				wp_enqueue_code_editor( [ 'type' => 'application/json' ] );
 				break;
@@ -285,7 +332,7 @@ class CSV_Import_Pro_Admin {
 	}
 
 	/**
-	 * Registriert Plugin-Einstellungen
+	 * Registriert Plugin-Einstellungen - KORRIGIERT
 	 */
 	public function register_plugin_settings() {
 		// Einstellungsgruppe registrieren
@@ -317,20 +364,22 @@ class CSV_Import_Pro_Admin {
 				'type'              => $config['type'],
 				'sanitize_callback' => $config['sanitize'],
 				'default'           => $this->get_default_value( $key ),
-				'show_in_rest'      => true,
+				'show_in_rest'      => current_user_can( 'manage_options' ), // KORRIGIERT
 			] );
 		}
 
-		// Erweiterte Einstellungen
-		register_setting( 'csv_import_advanced_settings', 'csv_import_advanced_settings', [
-			'type'              => 'array',
-			'sanitize_callback' => [ $this, 'sanitize_advanced_settings' ],
-			'default'           => $this->get_default_advanced_settings()
-		] );
+		// Erweiterte Einstellungen nur für Admins
+		if ( current_user_can( 'manage_options' ) ) {
+			register_setting( 'csv_import_advanced_settings', 'csv_import_advanced_settings', [
+				'type'              => 'array',
+				'sanitize_callback' => [ $this, 'sanitize_advanced_settings' ],
+				'default'           => $this->get_default_advanced_settings()
+			] );
+		}
 	}
 
 	/**
-	 * Verarbeitet AJAX-Anfragen für Admin-Funktionen
+	 * Verarbeitet AJAX-Anfragen für Admin-Funktionen - KORRIGIERT
 	 */
 	public function handle_admin_ajax() {
 		// Sicherheitsprüfung
@@ -338,7 +387,8 @@ class CSV_Import_Pro_Admin {
 			wp_send_json_error( [ 'message' => __( 'Sicherheitsprüfung fehlgeschlagen', 'csv-import' ) ] );
 		}
 
-		if ( ! current_user_can( 'manage_options' ) ) {
+		// KORRIGIERT: Basis-Berechtigung prüfen
+		if ( ! current_user_can( 'edit_pages' ) ) {
 			wp_send_json_error( [ 'message' => __( 'Keine Berechtigung', 'csv-import' ) ] );
 		}
 
@@ -350,6 +400,10 @@ class CSV_Import_Pro_Admin {
 				break;
 
 			case 'reset_plugin':
+				// KORRIGIERT: Reset nur für Admins
+				if ( ! current_user_can( 'manage_options' ) ) {
+					wp_send_json_error( [ 'message' => __( 'Admin-Berechtigung erforderlich', 'csv-import' ) ] );
+				}
 				$this->ajax_reset_plugin();
 				break;
 
@@ -358,6 +412,10 @@ class CSV_Import_Pro_Admin {
 				break;
 
 			case 'import_settings':
+				// KORRIGIERT: Import nur für Admins
+				if ( ! current_user_can( 'manage_options' ) ) {
+					wp_send_json_error( [ 'message' => __( 'Admin-Berechtigung erforderlich', 'csv-import' ) ] );
+				}
 				$this->ajax_import_settings();
 				break;
 
@@ -371,7 +429,7 @@ class CSV_Import_Pro_Admin {
 	}
 
 	/**
-	 * Fügt Plugin-Action-Links hinzu
+	 * Fügt Plugin-Action-Links hinzu - KORRIGIERT
 	 * 
 	 * @param array $links
 	 * @return array
@@ -380,12 +438,12 @@ class CSV_Import_Pro_Admin {
 		$plugin_links = [
 			'settings' => sprintf(
 				'<a href="%s">%s</a>',
-				admin_url( 'admin.php?page=csv-import-settings' ),
+				admin_url( 'tools.php?page=csv-import-settings' ), // KORRIGIERT: tools.php
 				__( 'Einstellungen', 'csv-import' )
 			),
 			'import' => sprintf(
 				'<a href="%s" style="color: #00a32a; font-weight: 600;">%s</a>',
-				admin_url( 'admin.php?page=csv-import' ),
+				admin_url( 'tools.php?page=csv-import' ), // KORRIGIERT: tools.php
 				__( 'Import starten', 'csv-import' )
 			)
 		];
@@ -415,6 +473,11 @@ class CSV_Import_Pro_Admin {
 				'<a href="%s" target="_blank">%s</a>',
 				'https://example.com/support',
 				__( 'Support', 'csv-import' )
+			),
+			'tools' => sprintf(
+				'<a href="%s">%s</a>',
+				admin_url( 'tools.php?page=csv-import' ), // KORRIGIERT
+				__( 'Zum Plugin', 'csv-import' )
 			)
 		];
 
@@ -422,10 +485,15 @@ class CSV_Import_Pro_Admin {
 	}
 
 	/**
-	 * Zeigt Plugin-spezifische Admin-Notices
+	 * Zeigt Plugin-spezifische Admin-Notices - KORRIGIERT
 	 */
 	public function show_plugin_notices() {
 		if ( ! $this->is_plugin_page() ) {
+			return;
+		}
+
+		// KORRIGIERT: Berechtigung für Notices prüfen
+		if ( ! current_user_can( 'edit_pages' ) ) {
 			return;
 		}
 
@@ -458,7 +526,7 @@ class CSV_Import_Pro_Admin {
 			echo '</div>';
 		}
 
-		// Konfigurationsfehler
+		// Konfigurationsfehler - nur für berechtigte Benutzer anzeigen
 		if ( function_exists( 'csv_import_get_config' ) && function_exists( 'csv_import_validate_config' ) ) {
 			$config = csv_import_get_config();
 			$validation = csv_import_validate_config( $config );
@@ -471,13 +539,23 @@ class CSV_Import_Pro_Admin {
 					echo '<li>' . esc_html( $error ) . '</li>';
 				}
 				echo '</ul>';
-				echo '<p><a href="' . esc_url( admin_url( 'admin.php?page=csv-import-settings' ) ) . '" class="button">' . __( 'Einstellungen korrigieren', 'csv-import' ) . '</a></p>';
+				echo '<p><a href="' . esc_url( admin_url( 'tools.php?page=csv-import-settings' ) ) . '" class="button">' . __( 'Einstellungen korrigieren', 'csv-import' ) . '</a></p>'; // KORRIGIERT
 				echo '</div>';
 			}
 		}
 
 		// System-Warnungen
 		$this->show_system_warnings();
+
+		// KORRIGIERT: Willkommens-Notice für neue Benutzer
+		if ( get_transient( 'csv_import_show_welcome' ) ) {
+			echo '<div class="notice notice-success is-dismissible">';
+			echo '<p><strong>' . __( 'Willkommen bei CSV Import Pro!', 'csv-import' ) . '</strong> ';
+			echo __( 'Das Plugin befindet sich jetzt im Tools-Menü für bessere Integration.', 'csv-import' );
+			echo ' <a href="' . esc_url( admin_url( 'tools.php?page=csv-import-settings' ) ) . '">' . __( 'Jetzt konfigurieren', 'csv-import' ) . '</a></p>';
+			echo '</div>';
+			delete_transient( 'csv_import_show_welcome' );
+		}
 	}
 
 	/**
@@ -492,9 +570,10 @@ class CSV_Import_Pro_Admin {
 		}
 
 		return sprintf(
-			__( 'Vielen Dank für die Nutzung von %s. | Version %s', 'csv-import' ),
+			__( 'Vielen Dank für die Nutzung von %s. | Version %s | %s', 'csv-import' ),
 			'<strong>CSV Import Pro</strong>',
-			CSV_IMPORT_PRO_VERSION
+			defined( 'CSV_IMPORT_PRO_VERSION' ) ? CSV_IMPORT_PRO_VERSION : '1.0.0',
+			'<a href="' . admin_url( 'tools.php' ) . '">' . __( 'Zurück zu Tools', 'csv-import' ) . '</a>'
 		);
 	}
 
@@ -541,6 +620,11 @@ class CSV_Import_Pro_Admin {
 	 * Zeigt die Scheduling-Seite an
 	 */
 	public function display_scheduling_page() {
+		// KORRIGIERT: Admin-Berechtigung für Scheduling prüfen
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( __( 'Für die Automatisierung sind Administrator-Rechte erforderlich.', 'csv-import' ) );
+		}
+
 		$this->handle_scheduling_actions();
 		$this->load_page_data( 'scheduling' );
 		$this->render_page( 'page-scheduling.php' );
@@ -556,24 +640,6 @@ class CSV_Import_Pro_Admin {
 	}
 
 	/**
-	 * Zeigt die erweiterten Einstellungen an
-	 */
-	public function display_advanced_settings_page() {
-		$this->handle_advanced_settings_submission();
-		$this->load_page_data( 'advanced' );
-		$this->render_page( 'page-advanced-settings.php' );
-	}
-
-	/**
-	 * Zeigt die Werkzeuge-Seite an
-	 */
-	public function display_tools_page() {
-		$this->handle_tools_actions();
-		$this->load_page_data( 'tools' );
-		$this->render_page( 'page-tools.php' );
-	}
-
-	/**
 	 * Zeigt die Debug-Seite an (nur bei aktiviertem Debug)
 	 */
 	public function display_debug_page() {
@@ -581,16 +647,20 @@ class CSV_Import_Pro_Admin {
 			wp_die( __( 'Debug-Modus ist nicht aktiviert.', 'csv-import' ) );
 		}
 
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( __( 'Admin-Berechtigung für Debug-Funktionen erforderlich.', 'csv-import' ) );
+		}
+
 		$this->load_page_data( 'debug' );
 		$this->render_page( 'page-debug.php' );
 	}
 
 	// ===================================================================
-	// HILFSFUNKTIONEN
+	// HILFSFUNKTIONEN - KORRIGIERT
 	// ===================================================================
 
 	/**
-	 * Prüft ob wir auf einer Plugin-Seite sind
+	 * Prüft ob wir auf einer Plugin-Seite sind - KORRIGIERT für Tools-Menü
 	 * 
 	 * @param string|null $hook_suffix
 	 * @return bool
@@ -600,18 +670,40 @@ class CSV_Import_Pro_Admin {
 			$hook_suffix = get_current_screen()->id ?? '';
 		}
 
-		return in_array( $hook_suffix, $this->admin_pages ) || 
+		// KORRIGIERT: Tools-Seiten-Pattern
+		$plugin_page_patterns = [
+			'tools_page_csv-import',
+			'tools_page_csv-import-settings',
+			'tools_page_csv-import-backups',
+			'tools_page_csv-import-profiles',
+			'tools_page_csv-import-scheduling',
+			'tools_page_csv-import-logs',
+			'tools_page_csv-import-debug'
+		];
+
+		return in_array( $hook_suffix, $plugin_page_patterns ) || 
+			   in_array( $hook_suffix, $this->admin_pages ) ||
 			   strpos( $hook_suffix, 'csv-import' ) !== false;
 	}
 
 	/**
-	 * Ermittelt den aktuellen Seiten-Slug
+	 * Ermittelt den aktuellen Seiten-Slug - KORRIGIERT
 	 * 
 	 * @param string $hook_suffix
 	 * @return string
 	 */
 	private function get_current_page_slug( $hook_suffix ) {
-		$page_mapping = array_flip( $this->admin_pages );
+		// KORRIGIERT: Tools-Seiten-Mapping
+		$page_mapping = [
+			'tools_page_csv-import' => 'csv-import',
+			'tools_page_csv-import-settings' => 'csv-import-settings',
+			'tools_page_csv-import-backups' => 'csv-import-backups',
+			'tools_page_csv-import-profiles' => 'csv-import-profiles',
+			'tools_page_csv-import-scheduling' => 'csv-import-scheduling',
+			'tools_page_csv-import-logs' => 'csv-import-logs',
+			'tools_page_csv-import-debug' => 'csv-import-debug'
+		];
+
 		return $page_mapping[ $hook_suffix ] ?? $this->menu_slug;
 	}
 
@@ -625,10 +717,12 @@ class CSV_Import_Pro_Admin {
 		$GLOBALS['csv_import_admin_data'] = [
 			'page_type' => $page_type,
 			'nonce_action' => 'csv_import_' . $page_type . '_action',
-			'current_user_can_import' => current_user_can( 'manage_options' ),
-			'plugin_version' => CSV_IMPORT_PRO_VERSION,
+			'current_user_can_import' => current_user_can( 'edit_pages' ), // KORRIGIERT
+			'current_user_can_admin' => current_user_can( 'manage_options' ),
+			'plugin_version' => defined( 'CSV_IMPORT_PRO_VERSION' ) ? CSV_IMPORT_PRO_VERSION : '1.0.0',
 			'wp_version' => get_bloginfo( 'version' ),
-			'php_version' => PHP_VERSION
+			'php_version' => PHP_VERSION,
+			'menu_location' => 'tools' // NEU: Für Template-Navigation
 		];
 
 		// Seitenspezifische Daten laden
@@ -650,12 +744,6 @@ class CSV_Import_Pro_Admin {
 				break;
 			case 'logs':
 				$this->load_logs_page_data();
-				break;
-			case 'advanced':
-				$this->load_advanced_page_data();
-				break;
-			case 'tools':
-				$this->load_tools_page_data();
 				break;
 			case 'debug':
 				$this->load_debug_page_data();
@@ -691,11 +779,20 @@ class CSV_Import_Pro_Admin {
 	private function render_fallback_page( $template_file ) {
 		echo '<div class="wrap">';
 		echo '<h1>' . esc_html( get_admin_page_title() ) . '</h1>';
+		
+		// KORRIGIERT: Bessere Fallback-Navigation
+		echo '<div class="nav-tab-wrapper">';
+		echo '<a href="' . admin_url( 'tools.php?page=csv-import' ) . '" class="nav-tab">Import Dashboard</a>';
+		echo '<a href="' . admin_url( 'tools.php?page=csv-import-settings' ) . '" class="nav-tab">Einstellungen</a>';
+		echo '<a href="' . admin_url( 'tools.php?page=csv-import-logs' ) . '" class="nav-tab">Logs</a>';
+		echo '</div>';
+		
 		echo '<div class="notice notice-error">';
 		echo '<p>' . sprintf( 
 			__( 'Template-Datei nicht gefunden: %s', 'csv-import' ), 
 			esc_html( $template_file ) 
 		) . '</p>';
+		echo '<p>' . __( 'Bitte prüfen Sie die Plugin-Installation oder kontaktieren Sie den Administrator.', 'csv-import' ) . '</p>';
 		echo '</div>';
 		echo '</div>';
 	}
@@ -841,46 +938,17 @@ class CSV_Import_Pro_Admin {
 	}
 
 	/**
-	 * Lädt erweiterte Einstellungen-Daten
-	 */
-	private function load_advanced_page_data() {
-		$advanced_settings = get_option( 'csv_import_advanced_settings', $this->get_default_advanced_settings() );
-
-		$GLOBALS['csv_import_admin_data'] = array_merge( $GLOBALS['csv_import_admin_data'], [
-			'advanced_settings' => $advanced_settings,
-			'system_info' => $this->get_system_info(),
-			'php_extensions' => get_loaded_extensions(),
-			'wp_debug' => defined( 'WP_DEBUG' ) && WP_DEBUG
-		] );
-	}
-
-	/**
-	 * Lädt Werkzeuge-Seiten-Daten
-	 */
-	private function load_tools_page_data() {
-		$GLOBALS['csv_import_admin_data'] = array_merge( $GLOBALS['csv_import_admin_data'], [
-			'tools' => [
-				'database_size' => $this->get_database_size(),
-				'upload_dir_size' => $this->get_upload_dir_size(),
-				'plugin_tables' => $this->get_plugin_tables(),
-				'temp_files' => $this->get_temp_files_count(),
-				'log_files' => $this->get_log_files_info()
-			],
-			'export_url' => wp_nonce_url(
-				admin_url( 'admin.php?page=csv-import-tools&action=export_settings' ),
-				'csv_import_export'
-			)
-		] );
-	}
-
-	/**
 	 * Lädt Debug-Seiten-Daten
 	 */
 	private function load_debug_page_data() {
 		$debug_info = [
 			'plugin_status' => method_exists( 'CSV_Import_Pro', 'get_status' ) ? csv_import_pro()->get_status() : [],
 			'wp_constants' => $this->get_wp_constants(),
-			'server_info' => $_SERVER,
+			'server_info' => array_filter( $_SERVER, function( $key ) {
+				// Sensible Daten ausfiltern
+				$safe_keys = [ 'SERVER_SOFTWARE', 'HTTP_HOST', 'REQUEST_METHOD', 'REQUEST_URI', 'HTTP_USER_AGENT' ];
+				return in_array( $key, $safe_keys );
+			}, ARRAY_FILTER_USE_KEY ),
 			'php_config' => [
 				'version' => PHP_VERSION,
 				'memory_limit' => ini_get( 'memory_limit' ),
@@ -893,7 +961,7 @@ class CSV_Import_Pro_Admin {
 
 		$GLOBALS['csv_import_admin_data'] = array_merge( $GLOBALS['csv_import_admin_data'], [
 			'debug_info' => $debug_info,
-			'can_debug' => current_user_can( 'manage_options' ) && CSV_IMPORT_DEBUG
+			'can_debug' => current_user_can( 'manage_options' ) && ( defined( 'CSV_IMPORT_DEBUG' ) && CSV_IMPORT_DEBUG )
 		] );
 	}
 
@@ -909,8 +977,12 @@ class CSV_Import_Pro_Admin {
 			return;
 		}
 
+		// KORRIGIERT: Berechtigung prüfen
+		if ( ! current_user_can( 'edit_pages' ) ) {
+			wp_die( __( 'Keine Berechtigung zum Ändern der Einstellungen.', 'csv-import' ) );
+		}
+
 		// WordPress Settings API übernimmt die Verarbeitung
-		// Zusätzliche Validierung hier möglich
 		$this->validate_and_save_settings();
 	}
 
@@ -918,7 +990,7 @@ class CSV_Import_Pro_Admin {
 	 * Verarbeitet Backup-Aktionen
 	 */
 	private function handle_backup_actions() {
-		if ( ! isset( $_POST['action'] ) || ! current_user_can( 'manage_options' ) ) {
+		if ( ! isset( $_POST['action'] ) || ! current_user_can( 'edit_pages' ) ) {
 			return;
 		}
 
@@ -943,7 +1015,7 @@ class CSV_Import_Pro_Admin {
 	 * Verarbeitet Profil-Aktionen
 	 */
 	private function handle_profile_actions() {
-		if ( ! isset( $_POST['action'] ) || ! current_user_can( 'manage_options' ) ) {
+		if ( ! isset( $_POST['action'] ) || ! current_user_can( 'edit_pages' ) ) {
 			return;
 		}
 
@@ -1005,7 +1077,7 @@ class CSV_Import_Pro_Admin {
 	 * Verarbeitet Logs-Aktionen
 	 */
 	private function handle_logs_actions() {
-		if ( ! isset( $_POST['action'] ) || ! current_user_can( 'manage_options' ) ) {
+		if ( ! isset( $_POST['action'] ) || ! current_user_can( 'edit_pages' ) ) {
 			return;
 		}
 
@@ -1013,42 +1085,6 @@ class CSV_Import_Pro_Admin {
 
 		if ( $action === 'clear_logs' && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'csv_import_clear_logs' ) ) {
 			$this->handle_clear_logs();
-		}
-	}
-
-	/**
-	 * Verarbeitet erweiterte Einstellungen
-	 */
-	private function handle_advanced_settings_submission() {
-		if ( ! isset( $_POST['submit'] ) || ! wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'update-options' ) ) {
-			return;
-		}
-
-		$this->save_advanced_settings();
-	}
-
-	/**
-	 * Verarbeitet Werkzeuge-Aktionen
-	 */
-	private function handle_tools_actions() {
-		if ( ! isset( $_GET['action'] ) || ! current_user_can( 'manage_options' ) ) {
-			return;
-		}
-
-		$action = sanitize_key( $_GET['action'] );
-
-		switch ( $action ) {
-			case 'export_settings':
-				if ( wp_verify_nonce( $_GET['_wpnonce'] ?? '', 'csv_import_export' ) ) {
-					$this->handle_export_settings();
-				}
-				break;
-
-			case 'reset_plugin':
-				if ( wp_verify_nonce( $_GET['_wpnonce'] ?? '', 'csv_import_reset' ) ) {
-					$this->handle_reset_plugin();
-				}
-				break;
 		}
 	}
 
@@ -1084,7 +1120,7 @@ class CSV_Import_Pro_Admin {
 	private function ajax_export_settings() {
 		$settings = $this->get_all_plugin_settings();
 		$export_data = [
-			'version' => CSV_IMPORT_PRO_VERSION,
+			'version' => defined( 'CSV_IMPORT_PRO_VERSION' ) ? CSV_IMPORT_PRO_VERSION : '1.0.0',
 			'exported' => current_time( 'mysql' ),
 			'settings' => $settings
 		];
@@ -1092,36 +1128,6 @@ class CSV_Import_Pro_Admin {
 		wp_send_json_success( [
 			'data' => base64_encode( wp_json_encode( $export_data ) ),
 			'filename' => 'csv-import-settings-' . date( 'Y-m-d-H-i-s' ) . '.json'
-		] );
-	}
-
-	/**
-	 * Importiert Einstellungen (AJAX)
-	 */
-	private function ajax_import_settings() {
-		if ( empty( $_FILES['settings_file'] ) ) {
-			wp_send_json_error( [ 'message' => 'Keine Datei hochgeladen' ] );
-		}
-
-		$file_content = file_get_contents( $_FILES['settings_file']['tmp_name'] );
-		$import_data = json_decode( $file_content, true );
-
-		if ( json_last_error() !== JSON_ERROR_NONE ) {
-			wp_send_json_error( [ 'message' => 'Ungültige JSON-Datei' ] );
-		}
-
-		$result = $this->import_plugin_settings( $import_data );
-		wp_send_json( $result );
-	}
-
-	/**
-	 * Holt System-Informationen (AJAX)
-	 */
-	private function ajax_get_system_info() {
-		wp_send_json_success( [
-			'system_info' => $this->get_system_info(),
-			'plugin_status' => method_exists( 'CSV_Import_Pro', 'get_status' ) ? csv_import_pro()->get_status() : [],
-			'health_check' => function_exists( 'csv_import_system_health_check' ) ? csv_import_system_health_check() : []
 		] );
 	}
 
@@ -1137,6 +1143,17 @@ class CSV_Import_Pro_Admin {
 
 		$result = $this->reset_plugin_data();
 		wp_send_json( $result );
+	}
+
+	/**
+	 * Holt System-Informationen (AJAX)
+	 */
+	private function ajax_get_system_info() {
+		wp_send_json_success( [
+			'system_info' => $this->get_system_info(),
+			'plugin_status' => method_exists( 'CSV_Import_Pro', 'get_status' ) ? csv_import_pro()->get_status() : [],
+			'health_check' => function_exists( 'csv_import_system_health_check' ) ? csv_import_system_health_check() : []
+		] );
 	}
 
 	// ===================================================================
@@ -1274,7 +1291,7 @@ class CSV_Import_Pro_Admin {
 			'max_retries' => 3,
 			'timeout' => 30000, // 30 Sekunden
 			'auto_refresh_progress' => true,
-			'show_debug_info' => CSV_IMPORT_DEBUG
+			'show_debug_info' => defined( 'CSV_IMPORT_DEBUG' ) && CSV_IMPORT_DEBUG
 		];
 	}
 
@@ -1417,14 +1434,29 @@ class CSV_Import_Pro_Admin {
 	}
 
 	/**
-	 * Rendert Dashboard-Widget
+	 * Rendert Dashboard-Widget - KORRIGIERT
 	 */
 	public function render_dashboard_widget() {
 		if ( function_exists( 'csv_import_dashboard_widget' ) ) {
 			csv_import_dashboard_widget();
 		} else {
+			echo '<div class="csv-import-widget">';
 			echo '<p>' . __( 'CSV Import Pro ist aktiv.', 'csv-import' ) . '</p>';
-			echo '<p><a href="' . esc_url( admin_url( 'admin.php?page=csv-import' ) ) . '" class="button">' . __( 'Import starten', 'csv-import' ) . '</a></p>';
+			
+			// Status-Informationen
+			$import_running = function_exists( 'csv_import_is_import_running' ) && csv_import_is_import_running();
+			if ( $import_running ) {
+				echo '<p><strong style="color: #d63638;">⏳ ' . __( 'Import läuft gerade', 'csv-import' ) . '</strong></p>';
+			} else {
+				echo '<p>✅ ' . __( 'Bereit für Import', 'csv-import' ) . '</p>';
+			}
+			
+			// KORRIGIERT: Tools-Menü-Links
+			echo '<p>';
+			echo '<a href="' . esc_url( admin_url( 'tools.php?page=csv-import' ) ) . '" class="button button-primary">' . __( 'Import starten', 'csv-import' ) . '</a> ';
+			echo '<a href="' . esc_url( admin_url( 'tools.php?page=csv-import-settings' ) ) . '" class="button">' . __( 'Einstellungen', 'csv-import' ) . '</a>';
+			echo '</p>';
+			echo '</div>';
 		}
 	}
 
@@ -1445,7 +1477,7 @@ class CSV_Import_Pro_Admin {
 	}
 
 	/**
-	 * Zeigt System-Warnungen
+	 * Zeigt System-Warnungen - KORRIGIERT
 	 */
 	private function show_system_warnings() {
 		if ( ! function_exists( 'csv_import_system_health_check' ) ) {
@@ -1481,7 +1513,7 @@ class CSV_Import_Pro_Admin {
 		}
 		
 		echo '</ul>';
-		echo '<p><a href="' . esc_url( admin_url( 'admin.php?page=csv-import-advanced' ) ) . '" class="button">' . __( 'System-Details anzeigen', 'csv-import' ) . '</a></p>';
+		echo '<p><a href="' . esc_url( admin_url( 'tools.php?page=csv-import-logs' ) ) . '" class="button">' . __( 'System-Details anzeigen', 'csv-import' ) . '</a></p>'; // KORRIGIERT
 		echo '</div>';
 	}
 
@@ -1675,55 +1707,9 @@ class CSV_Import_Pro_Admin {
 		if ( class_exists( 'CSV_Import_Error_Handler' ) && method_exists( 'CSV_Import_Error_Handler', 'clear_error_log' ) ) {
 			CSV_Import_Error_Handler::clear_error_log();
 			
-			wp_redirect( add_query_arg( 'logs_cleared', 'true', admin_url( 'admin.php?page=csv-import-logs' ) ) );
+			wp_redirect( add_query_arg( 'logs_cleared', 'true', admin_url( 'tools.php?page=csv-import-logs' ) ) ); // KORRIGIERT
 			exit;
 		}
-	}
-
-	/**
-	 * Speichert erweiterte Einstellungen
-	 */
-	private function save_advanced_settings() {
-		$settings = $_POST; // Wird durch sanitize_advanced_settings() bereinigt
-		unset( $settings['submit'], $settings['_wpnonce'], $settings['_wp_http_referer'] );
-		
-		$sanitized = $this->sanitize_advanced_settings( $settings );
-		update_option( 'csv_import_advanced_settings', $sanitized );
-		
-		$GLOBALS['csv_import_admin_data']['settings_saved'] = true;
-	}
-
-	/**
-	 * Behandelt Einstellungs-Export
-	 */
-	private function handle_export_settings() {
-		$settings = $this->get_all_plugin_settings();
-		$export_data = [
-			'version' => CSV_IMPORT_PRO_VERSION,
-			'exported' => current_time( 'mysql' ),
-			'site_url' => get_site_url(),
-			'settings' => $settings
-		];
-
-		$filename = 'csv-import-settings-' . date( 'Y-m-d-H-i-s' ) . '.json';
-		
-		header( 'Content-Type: application/json' );
-		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
-		header( 'Cache-Control: must-revalidate, post-check=0, pre-check=0' );
-		header( 'Expires: 0' );
-		
-		echo wp_json_encode( $export_data, JSON_PRETTY_PRINT );
-		exit;
-	}
-
-	/**
-	 * Behandelt Plugin-Reset
-	 */
-	private function handle_reset_plugin() {
-		$this->reset_plugin_data();
-		
-		wp_redirect( add_query_arg( 'reset', 'success', admin_url( 'admin.php?page=csv-import' ) ) );
-		exit;
 	}
 
 	// ===================================================================
@@ -1809,31 +1795,6 @@ class CSV_Import_Pro_Admin {
 	}
 
 	/**
-	 * Importiert Plugin-Einstellungen
-	 * 
-	 * @param array $import_data
-	 * @return array
-	 */
-	private function import_plugin_settings( $import_data ) {
-		if ( ! isset( $import_data['settings'] ) || ! is_array( $import_data['settings'] ) ) {
-			return [ 'success' => false, 'message' => 'Ungültige Einstellungsdaten' ];
-		}
-
-		$imported = 0;
-		foreach ( $import_data['settings'] as $option_name => $option_value ) {
-			if ( strpos( $option_name, 'csv_import_' ) === 0 ) {
-				update_option( $option_name, $option_value );
-				$imported++;
-			}
-		}
-
-		return [
-			'success' => $imported > 0,
-			'message' => "Erfolgreich {$imported} Einstellungen importiert"
-		];
-	}
-
-	/**
 	 * Setzt Plugin-Daten zurück
 	 * 
 	 * @return array
@@ -1869,108 +1830,24 @@ class CSV_Import_Pro_Admin {
 			'message' => 'Plugin erfolgreich zurückgesetzt'
 		];
 	}
-
-	/**
-	 * Holt Datenbank-Größe
-	 * 
-	 * @return string
-	 */
-	private function get_database_size() {
-		global $wpdb;
-		
-		$result = $wpdb->get_var( "
-			SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 1) AS 'size_mb'
-			FROM information_schema.tables 
-			WHERE table_schema = '{$wpdb->dbname}'
-		" );
-
-		return $result ? $result . ' MB' : 'Unbekannt';
-	}
-
-	/**
-	 * Holt Upload-Verzeichnis-Größe
-	 * 
-	 * @return string
-	 */
-	private function get_upload_dir_size() {
-		$upload_dir = wp_upload_dir();
-		$size = $this->get_directory_size( $upload_dir['basedir'] );
-		
-		return $size ? size_format( $size ) : 'Unbekannt';
-	}
-
-	/**
-	 * Berechnet Verzeichnis-Größe rekursiv
-	 * 
-	 * @param string $directory
-	 * @return int
-	 */
-	private function get_directory_size( $directory ) {
-		$size = 0;
-		
-		if ( ! is_dir( $directory ) ) {
-			return 0;
-		}
-
-		foreach ( new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $directory ) ) as $file ) {
-			if ( $file->isFile() ) {
-				$size += $file->getSize();
-			}
-		}
-
-		return $size;
-	}
-
-	/**
-	 * Holt Plugin-Tabellen
-	 * 
-	 * @return array
-	 */
-	private function get_plugin_tables() {
-		global $wpdb;
-		
-		$tables = $wpdb->get_results( "SHOW TABLES LIKE '{$wpdb->prefix}csv_import_%'" );
-		
-		return array_map( function( $table ) {
-			return array_values( (array) $table )[0];
-		}, $tables );
-	}
-
-	/**
-	 * Holt Anzahl temporärer Dateien
-	 * 
-	 * @return int
-	 */
-	private function get_temp_files_count() {
-		$upload_dir = wp_upload_dir();
-		$temp_dir = $upload_dir['basedir'] . '/csv-import-temp/';
-		
-		if ( ! is_dir( $temp_dir ) ) {
-			return 0;
-		}
-
-		$files = glob( $temp_dir . '*' );
-		return count( $files );
-	}
-
-	/**
-	 * Holt Log-Dateien-Informationen
-	 * 
-	 * @return array
-	 */
-	private function get_log_files_info() {
-		$upload_dir = wp_upload_dir();
-		$log_files = glob( $upload_dir['basedir'] . '/csv-import*.log' );
-		
-		$info = [];
-		foreach ( $log_files as $file ) {
-			$info[] = [
-				'name' => basename( $file ),
-				'size' => size_format( filesize( $file ) ),
-				'modified' => date( 'Y-m-d H:i:s', filemtime( $file ) )
-			];
-		}
-
-		return $info;
-	}
 }
+
+// ===================================================================
+// PLUGIN AKTIVIERUNG - KORRIGIERT
+// ===================================================================
+
+/**
+ * Setzt Willkommens-Transient bei Plugin-Aktivierung
+ */
+register_activation_hook( CSV_IMPORT_PRO_BASENAME, function() {
+	// Willkommens-Notice für 24 Stunden setzen
+	set_transient( 'csv_import_show_welcome', true, DAY_IN_SECONDS );
+	
+	// Emergency-Admin-Access sicherstellen
+	if ( current_user_can( 'activate_plugins' ) ) {
+		$user = wp_get_current_user();
+		if ( $user && ! $user->has_cap( 'edit_pages' ) ) {
+			$user->add_cap( 'edit_pages' );
+		}
+	}
+} );
