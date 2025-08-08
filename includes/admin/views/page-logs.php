@@ -97,7 +97,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 						<tbody>
 							<?php foreach ( $logs as $log_entry ) : ?>
 								<tr class="log-row log-level-<?php echo esc_attr( $log_entry['level'] ); ?>">
-									<td><?php echo esc_html( mysql2date('d.m.Y H:i:s', $log_entry['time']) ); ?></td>
+									<td><?php 
+    if ( ! empty( $log_entry['timestamp'] ) ) {
+        echo esc_html( mysql2date('d.m.Y H:i:s', $log_entry['timestamp']) ); 
+    }
+    ?></td>
 									<td>
 										<span class="log-level-badge level-<?php echo esc_attr( $log_entry['level'] ); ?>">
 											<?php echo esc_html( strtoupper( $log_entry['level'] ) ); ?>
