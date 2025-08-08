@@ -46,7 +46,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<div class="status-card">
 				<h3>Import-Fortschritt</h3>
 				<?php $progress = csv_import_get_progress(); ?>
-				<?php if ( $progress['status'] === 'processing' ) : ?>
+				<?php if ( $progress['running'] ) : ?>
 					<div class="progress-active">
 						<div class="progress-bar">
 							<div class="progress-fill" style="width: <?php echo esc_attr( $progress['percent'] ); ?>%"></div>
@@ -63,14 +63,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<div class="log-filters">
 				<a href="<?php echo esc_url( admin_url('tools.php?page=csv-import-logs') ); ?>" 
 				   class="filter-button <?php echo $filter_level === 'all' ? 'active' : ''; ?>">
-					Alle (<?php echo count( $error_stats['recent_errors'] ?? [] ); ?>)
+					Alle (<?php echo esc_html($total_logs); ?>)
 				</a>
-				<?php foreach ( ['critical', 'error', 'warning', 'info'] as $level ) : ?>
+				<?php foreach ( ['critical', 'error', 'warning', 'info', 'debug'] as $level ) : ?>
 					<?php 
 					$level_count = $error_stats['errors_by_level'][$level] ?? 0;
 					if ($level_count > 0) :
 					?>
-					<a href="<?php echo esc_url( admin_url('tools.php?page=csv-import-logs&level=' . $level) ); ?>" 
+					<a href="<?php echo esc_url( add_query_arg('level', $level, admin_url('tools.php?page=csv-import-logs')) ); ?>" 
 					   class="filter-button filter-<?php echo esc_attr($level); ?> <?php echo $filter_level === $level ? 'active' : ''; ?>">
 						<?php echo esc_html( ucfirst($level) ); ?> (<?php echo esc_html($level_count); ?>)
 					</a>
@@ -96,20 +96,23 @@ if ( ! defined( 'ABSPATH' ) ) {
 						</thead>
 						<tbody>
 							<?php foreach ( $logs as $log_entry ) : ?>
-								<tr class="log-row log-level-<?php echo esc_attr( $log_entry['level'] ); ?>">
-									<td><?php 
-    if ( ! empty( $log_entry['timestamp'] ) ) {
-        echo esc_html( mysql2date('d.m.Y H:i:s', $log_entry['timestamp']) ); 
-    }
-    ?></td>
+								<tr class="log-row log-level-<?php echo esc_attr( $log_entry['level'] ?? 'debug' ); ?>">
 									<td>
-										<span class="log-level-badge level-<?php echo esc_attr( $log_entry['level'] ); ?>">
-											<?php echo esc_html( strtoupper( $log_entry['level'] ) ); ?>
+                                        <?php 
+                                        // **KORREKTUR HIER**
+                                        if ( ! empty( $log_entry['timestamp'] ) ) {
+                                            echo esc_html( mysql2date('d.m.Y H:i:s', $log_entry['timestamp']) ); 
+                                        } 
+                                        ?>
+                                    </td>
+									<td>
+										<span class="log-level-badge level-<?php echo esc_attr( $log_entry['level'] ?? '' ); ?>">
+											<?php echo esc_html( strtoupper( $log_entry['level'] ?? '' ) ); ?>
 										</span>
 									</td>
 									<td>
 										<div class="log-message">
-											<?php echo esc_html( $log_entry['message'] ); ?>
+											<?php echo esc_html( $log_entry['message'] ?? '' ); ?>
 										</div>
 									</td>
 								</tr>
