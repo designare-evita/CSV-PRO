@@ -5,8 +5,7 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
-?>
-<div class="wrap">
+?><div class="wrap">
     <h1>CSV Import Backups &amp; Rollback</h1>
 
     <?php
@@ -16,10 +15,6 @@ if ( ! defined( 'ABSPATH' ) ) {
         } else {
             echo '<div class="notice notice-error is-dismissible"><p>Rollback-Fehler: ' . esc_html( implode( ', ', $rollback_result['errors'] ) ) . '</p></div>';
         }
-    }
-
-    if ( isset( $deleted_count ) ) {
-        echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $deleted_count ) . ' alte Backup-Einträge gelöscht.</p></div>';
     }
     ?>
     
@@ -65,25 +60,6 @@ if ( ! defined( 'ABSPATH' ) ) {
                     </tbody>
                 </table>
             <?php endif; ?>
-        </div>
-        
-        <div class="card">
-            <h2>🧹 Backup-Verwaltung</h2>
-            <?php
-            $advanced_settings = get_option( 'csv_import_advanced_settings', ['backup_retention_days' => 30] );
-            $retention_days = $advanced_settings['backup_retention_days'] ?? 30;
-            ?>
-            <p>Automatische Bereinigung alter Backups nach <?php echo esc_html($retention_days); ?> Tagen.</p>
-            <form method="post">
-                <?php wp_nonce_field( 'csv_import_cleanup_backups' ); ?>
-                <input type="hidden" name="cleanup_backups" value="1">
-                <button type="submit" class="button" onclick="return confirm('Alle Backups älter als <?php echo esc_js($retention_days); ?> Tage wirklich löschen?');">
-                    🗑️ Alte Backups bereinigen
-                </button>
-            </form>
-            <p class="description">
-                Die Aufbewahrungsdauer können Sie in den <a href="<?php echo esc_url(admin_url('tools.php?page=csv-import-advanced')); ?>">erweiterten Einstellungen</a> ändern.
-            </p>
         </div>
     </div>
 </div>
