@@ -5,8 +5,7 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
-?>
-<div class="wrap">
+?><div class="wrap">
 	<h1>CSV Import Einstellungen</h1>
 
 	<?php
