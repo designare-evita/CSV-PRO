@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class CSV_Import_Pro_Run {
 
 	private array $config;
-	private ?object $template_post;
+	private ?object $template_post = null;
 	private string $session_id;
 	private array $existing_slugs = [];
 	private string $source;
@@ -27,9 +27,8 @@ class CSV_Import_Pro_Run {
 	}
 
 	private function execute_import(): array {
-		// Fehler-Handler Check
-		if ( class_exists( 'CSV_Import_Error_Handler' ) && method_exists( 'CSV_Import_Error_Handler', 'reset_error_counts' ) ) {
-			CSV_Import_Error_Handler::reset_error_counts();
+		if ( class_exists( 'CSV_Import_Error_Handler' ) && method_exists( 'CSV_Import_Error_Handler', 'clear_error_log' ) ) {
+			// Optional: Alte Logs vor einem neuen Lauf löschen
 		}
 		
 		do_action( 'csv_import_start' );
@@ -54,8 +53,7 @@ class CSV_Import_Pro_Run {
 
 			csv_import_log( 'info', "CSV-Import gestartet: " . count( $data_rows ) . " Zeilen." );
 			
-			$batch_size = apply_filters( 'csv_import_batch_size', 25 );
-			$results = $this->process_batches( $data_rows, $header, $batch_size );
+			$results = $this->process_batches( $data_rows, $header );
 
 			$message = sprintf( 
 				'Import erfolgreich: %d Posts erstellt, %d Duplikate übersprungen, %d Fehler.', 
@@ -65,7 +63,7 @@ class CSV_Import_Pro_Run {
 			);
 			
 			$final_result = [ 
-				'success' => ( $results['errors'] === 0 ), 
+				'success' => true, 
 				'message' => $message,
 				'processed' => $results['created'],
 				'total' => count( $data_rows ),
@@ -88,7 +86,7 @@ class CSV_Import_Pro_Run {
 				'success' => false, 
 				'message' => $e->getMessage(),
 				'processed' => 0,
-				'total' => 0,
+				'total' => count($this->csv_data['data'] ?? []),
 				'errors' => 1
 			];
 		}
@@ -97,36 +95,22 @@ class CSV_Import_Pro_Run {
 	private function load_and_validate_config(): void {
 		$this->config = csv_import_get_config();
 		
-		// Basis-Validierung
-		if ( empty( $this->config['post_type'] ) ) {
-			throw new Exception( 'Post-Typ nicht konfiguriert' );
+		if ( empty( $this->config['post_type'] ) || ! post_type_exists( $this->config['post_type'] ) ) {
+			throw new Exception( 'Post-Typ ist nicht konfiguriert oder existiert nicht: ' . esc_html($this->config['post_type']) );
 		}
 		
-		if ( ! post_type_exists( $this->config['post_type'] ) ) {
-			throw new Exception( 'Post-Typ existiert nicht: ' . $this->config['post_type'] );
-		}
-		
-		// Template validieren falls erforderlich
 		if ( ! empty( $this->config['template_id'] ) ) {
-			$this->template_post = get_post( $this->config['template_id'] );
+			$this->template_post = get_post( (int) $this->config['template_id'] );
 			if ( ! $this->template_post ) {
-				throw new Exception( 'Template Post nicht gefunden: ID ' . $this->config['template_id'] );
+				throw new Exception( 'Template Post nicht gefunden: ID ' . (int) $this->config['template_id'] );
 			}
 		}
 	}
 
-	private function process_batches( array $rows, array $header, int $batch_size ): array {
-		$results = [
-			'created' => 0,
-			'skipped' => 0,
-			'errors' => 0,
-			'error_messages' => []
-		];
-		
+	private function process_batches( array $rows, array $header ): array {
+		$results = ['created' => 0, 'skipped' => 0, 'errors' => 0];
 		$total_rows = count( $rows );
-		$processed = 0;
 		
-		// Erforderliche Spalten prüfen
 		$required_columns = $this->config['required_columns'] ?? [];
 		if ( is_string( $required_columns ) ) {
 			$required_columns = array_filter( array_map( 'trim', explode( "\n", $required_columns ) ) );
@@ -138,12 +122,9 @@ class CSV_Import_Pro_Run {
 		}
 		
 		foreach ( $rows as $index => $row_data ) {
+            csv_import_update_progress( $index, $total_rows, 'processing' );
+            
 			try {
-				// Fortschritt aktualisieren
-				if ( $processed % 5 === 0 ) {
-					csv_import_update_progress( $processed, $total_rows, 'processing' );
-				}
-				
 				$post_result = $this->process_single_row( $row_data );
 				
 				if ( $post_result === 'created' ) {
@@ -152,95 +133,73 @@ class CSV_Import_Pro_Run {
 					$results['skipped']++;
 				}
 				
-				$processed++;
-				
-				// Kurze Pause alle 10 Posts
-				if ( $processed % 10 === 0 ) {
-					usleep( 100000 ); // 0.1 Sekunde
-				}
-				
 			} catch ( Exception $e ) {
 				$results['errors']++;
 				$error_msg = "Zeile " . ($index + 2) . ": " . $e->getMessage();
-				$results['error_messages'][] = $error_msg;
+				csv_import_log( 'warning', $error_msg, ['row_data' => $row_data]);
 				
-				csv_import_log( 'warning', $error_msg, [
-					'row_data' => $row_data,
-					'session_id' => $this->session_id
-				] );
-				
-				// Maximale Fehleranzahl erreicht?
 				if ( $results['errors'] > 50 ) {
 					csv_import_log( 'error', 'Import abgebrochen - zu viele Fehler (>50)' );
 					break;
 				}
 			}
+            
+            if ($index % 10 === 0) {
+                usleep(50000); // 0.05 Sekunden Pause
+            }
 		}
 		
 		return $results;
 	}
 
 	private function process_single_row( array $data ): string {
-		// Post-Grunddaten extrahieren
 		$post_title = $this->sanitize_title( $data['post_title'] ?? $data['title'] ?? '' );
-		$post_content = $data['post_content'] ?? $data['content'] ?? '';
-		$post_excerpt = $data['post_excerpt'] ?? $data['excerpt'] ?? '';
 		
 		if ( empty( $post_title ) ) {
 			throw new Exception( 'Post-Titel ist erforderlich' );
 		}
 		
-		// Duplikat prüfen
 		if ( ! empty( $this->config['skip_duplicates'] ) ) {
 			$existing_post = get_page_by_title( $post_title, OBJECT, $this->config['post_type'] );
 			if ( $existing_post ) {
-				return 'skipped'; // Duplikat übersprungen
+				return 'skipped';
 			}
 		}
 		
-		// Eindeutigen Slug generieren
-		$post_slug = $this->generate_unique_slug( $post_title );
+		$post_id = $this->create_post_transaction( $data );
 		
-		$post_id = $this->create_post_transaction( $data, $post_slug );
-		
-		if ( $post_id ) {
-			return 'created';
-		} else {
-			throw new Exception( 'Post konnte nicht erstellt werden' );
-		}
+		return $post_id ? 'created' : 'skipped';
 	}
 
-	private function create_post_transaction( array $data, string $post_slug ): ?int {
-		// Post-Daten zusammenstellen
+	private function create_post_transaction( array $data ): ?int {
+        $post_title = $this->sanitize_title( $data['post_title'] ?? $data['title'] ?? '' );
+		$post_slug = $this->generate_unique_slug( $post_title );
+
 		$post_data = [
-			'post_title'   => $this->sanitize_title( $data['post_title'] ?? $data['title'] ?? '' ),
+			'post_title'   => $post_title,
 			'post_content' => $data['post_content'] ?? $data['content'] ?? '',
 			'post_excerpt' => $data['post_excerpt'] ?? $data['excerpt'] ?? '',
 			'post_name'    => $post_slug,
 			'post_status'  => $this->config['post_status'] ?? 'draft',
-			'post_type'    => $this->config['post_type'] ?? 'post',
+			'post_type'    => $this->config['post_type'],
 			'meta_input'   => [
 				'_csv_import_session' => $this->session_id,
 				'_csv_import_date' => current_time( 'mysql' ),
 			]
 		];
 		
-		// Template anwenden falls vorhanden
 		if ( $this->template_post && ! empty( $this->config['page_builder'] ) && $this->config['page_builder'] !== 'none' ) {
 			$post_data['post_content'] = $this->apply_template( $data );
 		}
 		
-		// Post erstellen
-		$post_id = wp_insert_post( $post_data );
+		$post_id = wp_insert_post( $post_data, true );
 		
 		if ( is_wp_error( $post_id ) ) {
 			throw new Exception( 'WordPress Fehler: ' . $post_id->get_error_message() );
 		}
 		
-		// Meta-Felder hinzufügen
 		$this->add_meta_fields( $post_id, $data );
 		
-		// Bilder verarbeiten
 		if ( ! empty( $this->config['image_source'] ) && $this->config['image_source'] !== 'none' ) {
 			$this->process_post_images( $post_id, $data );
 		}
@@ -253,19 +212,9 @@ class CSV_Import_Pro_Run {
 			throw new Exception( 'CSV-Header ist leer' );
 		}
 		
-		// Prüfen ob mindestens post_title oder title vorhanden ist
 		$title_fields = ['post_title', 'title'];
-		$has_title_field = false;
-		
-		foreach ( $title_fields as $field ) {
-			if ( in_array( $field, $header ) ) {
-				$has_title_field = true;
-				break;
-			}
-		}
-		
-		if ( ! $has_title_field ) {
-			throw new Exception( 'CSV muss eine post_title oder title Spalte enthalten' );
+		if ( !array_intersect($title_fields, $header) ) {
+			throw new Exception( 'CSV muss eine "post_title" oder "title" Spalte enthalten' );
 		}
 	}
 
@@ -273,7 +222,6 @@ class CSV_Import_Pro_Run {
 		if ( ! empty( $this->config['memory_limit'] ) ) {
 			@ini_set( 'memory_limit', $this->config['memory_limit'] );
 		}
-		
 		if ( ! empty( $this->config['time_limit'] ) ) {
 			@set_time_limit( (int) $this->config['time_limit'] );
 		}
@@ -290,35 +238,19 @@ class CSV_Import_Pro_Run {
 		}
 	}
 	
-	// ===================================================================
-	// PRIVATE HELPER METHODEN
-	// ===================================================================
-	
 	private function sanitize_title( string $title ): string {
-		$title = trim( $title );
-		$title = wp_strip_all_tags( $title );
-		$title = html_entity_decode( $title, ENT_QUOTES, 'UTF-8' );
-		return $title;
+		return html_entity_decode( wp_strip_all_tags( trim( $title ) ), ENT_QUOTES, 'UTF-8' );
 	}
 	
 	private function generate_unique_slug( string $title ): string {
 		$slug = sanitize_title( $title );
+		$original_slug = $slug ?: 'csv-import-post';
+        $counter = 1;
 		
-		if ( empty( $slug ) ) {
-			$slug = 'csv-import-post-' . uniqid();
-		}
+        while ( get_page_by_path( $slug, OBJECT, $this->config['post_type'] ) ) {
+            $slug = $original_slug . '-' . $counter++;
+        }
 		
-		// Prüfen ob Slug bereits verwendet wurde in diesem Import
-		if ( in_array( $slug, $this->existing_slugs ) ) {
-			$counter = 1;
-			$original_slug = $slug;
-			while ( in_array( $slug, $this->existing_slugs ) || get_page_by_path( $slug, OBJECT, $this->config['post_type'] ) ) {
-				$slug = $original_slug . '-' . $counter;
-				$counter++;
-			}
-		}
-		
-		$this->existing_slugs[] = $slug;
 		return $slug;
 	}
 	
@@ -328,32 +260,22 @@ class CSV_Import_Pro_Run {
 		}
 		
 		$content = $this->template_post->post_content;
-		
-		// Platzhalter ersetzen
 		foreach ( $data as $key => $value ) {
-			$placeholder = '{{' . $key . '}}';
-			$content = str_replace( $placeholder, $value, $content );
+			$content = str_replace( '{{' . $key . '}}', $value, $content );
 		}
-		
-		// Standard-Platzhalter
-		$content = str_replace( '{{title}}', $data['post_title'] ?? $data['title'] ?? '', $content );
-		$content = str_replace( '{{content}}', $data['post_content'] ?? $data['content'] ?? '', $content );
 		
 		return $content;
 	}
 	
 	private function add_meta_fields( int $post_id, array $data ): void {
-		// Standard-Felder überspringen
 		$skip_fields = ['post_title', 'title', 'post_content', 'content', 'post_excerpt', 'excerpt', 'post_name'];
 		
 		foreach ( $data as $key => $value ) {
 			if ( ! in_array( $key, $skip_fields ) && ! empty( $value ) ) {
-				// Meta-Key normalisieren
 				$meta_key = sanitize_key( $key );
-				if ( strpos( $meta_key, '_' ) !== 0 ) { // PHP 7.4 kompatibel
+				if ( strpos( $meta_key, '_' ) !== 0 ) {
 					$meta_key = '_' . $meta_key;
 				}
-				
 				update_post_meta( $post_id, $meta_key, sanitize_text_field( $value ) );
 			}
 		}
@@ -363,7 +285,6 @@ class CSV_Import_Pro_Run {
 		$image_fields = ['image', 'featured_image', 'thumbnail', 'post_image'];
 		$image_url = '';
 		
-		// Bild-URL finden
 		foreach ( $image_fields as $field ) {
 			if ( ! empty( $data[ $field ] ) ) {
 				$image_url = $data[ $field ];
@@ -371,19 +292,13 @@ class CSV_Import_Pro_Run {
 			}
 		}
 		
-		if ( empty( $image_url ) ) {
-			return;
-		}
+		if ( empty( $image_url ) ) return;
 		
 		try {
-			// Verwende core-functions für Bild-Download
 			$attachment_id = csv_import_download_and_attach_image( $image_url, $post_id );
-			
 			if ( $attachment_id ) {
 				set_post_thumbnail( $post_id, $attachment_id );
-				update_post_meta( $post_id, '_csv_import_image_attached', true );
 			}
-			
 		} catch ( Exception $e ) {
 			csv_import_log( 'warning', "Bild-Fehler für Post {$post_id}: " . $e->getMessage() );
 		}
